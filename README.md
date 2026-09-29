@@ -1,4 +1,4 @@
-# 🤖 Report Card RPA Bot
+# Report Card RPA Bot
 
 An RPA (Robotic Process Automation) bot that automatically generates student report cards as Thai-language PDFs and emails them to parents.
 
@@ -6,7 +6,7 @@ An RPA (Robotic Process Automation) bot that automatically generates student rep
 
 ![Sample report card](docs/sample_report_card.png)
 
-## ✨ Features
+## Features
 
 - **Read data** — loads student scores from a CSV file
 - **Validate** — checks for missing fields, out-of-range scores (0–100) and invalid email addresses; bad rows are skipped and logged instead of crashing the run
@@ -15,17 +15,17 @@ An RPA (Robotic Process Automation) bot that automatically generates student rep
 - **Email** — sends each PDF to the parent via SMTP (Gmail)
 - **Log & summarize** — writes a run log (`bot_log.log`) and a per-student result file (`summary.csv`)
 
-## 🔄 Workflow
+## Workflow
 
 ```
 students.csv → Validate → Calculate grades & GPA → Generate PDF → Send email → summary.csv + log
 ```
 
-## 🛠️ Tech Stack
+## Tech Stack
 
 Python · pandas · ReportLab · smtplib · python-dotenv
 
-## 🚀 Getting Started
+## Getting Started
 
 **1. Install dependencies**
 ```bash
@@ -62,7 +62,7 @@ PDFs are saved in `report_cards/`, and results in `summary.csv`.
 
 A full sample PDF is in [`docs/sample_report_card.pdf`](docs/sample_report_card.pdf).
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 ├── rpa_bot.py          # main bot script
@@ -73,15 +73,15 @@ A full sample PDF is in [`docs/sample_report_card.pdf`](docs/sample_report_card.
 └── docs/               # sample output
 ```
 
-## ⚙️ Customization
+## Customization
 
 Edit `CONFIG` and `SUBJECTS` at the top of `rpa_bot.py` to change the school name, semester, passing score or subject list.
 
-## 👥 Authors
+##  Authors
 
 - พีรพล อินทะสิทธิ์ (Phirapon Intasit)
-- พีรณัฐ เมฆฉาย
+- พีรณัฐ เมฆฉาย (Peeranut Mekchay)
 
-## 📝 Credits
+## Credits
 
 TH Sarabun New font by SIPA (Software Industry Promotion Agency), free to use and redistribute.
