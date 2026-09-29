@@ -1,0 +1,6 @@
+student_id,first_name,last_name,math,science,english,thai,social,parent_email
+6700001,สมชาย,ใจดี,85,78,72,90,81,parent1@example.com
+6700002,สมหญิง,รักเรียน,92,88,95,84,90,parent2@example.com
+6700003,มานะ,อดทน,64,45,58,70,62,parent3@example.com
+6700004,ปิติ,ยิ้มแย้ม,55,61,,73,68,parent4@example.com
+6700005,ชูใจ,สดใส,77,82,69,88,74,not-an-email
