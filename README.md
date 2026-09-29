@@ -27,6 +27,8 @@ Python · pandas · ReportLab · smtplib · python-dotenv
 
 ## Getting Started
 
+Requires **Python 3.9+**.
+
 **1. Install dependencies**
 ```bash
 pip install -r requirements.txt
@@ -46,9 +48,53 @@ With `SEND_EMAIL=false` (default), the bot only generates PDFs — useful for te
 ```bash
 python rpa_bot.py
 ```
-PDFs are saved in `report_cards/`, and results in `summary.csv`.
+PDFs are saved in `report_cards/`, and results in `summary.csv` (with `email_status`: `sent` / `skipped`). The script can be run from any folder — all paths are relative to `rpa_bot.py`.
 
-## 📊 Sample Data & Output
+Example console output:
+```
+[3/5] ประมวลผล: 6700003
+  📄 สร้าง PDF: .../report_cards/6700003_report_card.pdf
+  📧 [SKIP] ส่ง Email ถึง parent3@example.com (ปิดใน config)
+[4/5] ประมวลผล: 6700004
+  ⚠️  ข้อมูลไม่ผ่าน: ขาดคะแนน ภาษาอังกฤษ
+📊 สรุปผล → .../summary.csv
+   สำเร็จ : 3
+   ล้มเหลว: 2
+```
+
+**4. Run tests**
+```bash
+python test_rpa_bot.py
+```
+
+## Input Format
+
+`students.csv` (UTF-8) must have these columns:
+
+| column | description |
+|---|---|
+| `student_id`, `first_name`, `last_name` | required |
+| `math`, `science`, `english`, `thai`, `social` | numeric score 0–100 (must match keys in `SUBJECTS`) |
+| `parent_email` | recipient address |
+
+A row with a missing/non-numeric/out-of-range score or an invalid email is skipped and recorded as `error` in `summary.csv`. If sending an email fails (e.g. wrong App Password), that student is also marked `error` with the reason.
+
+## Grading Scale
+
+| Score | Grade | Label |
+|---|---|---|
+| 80–100 | 4.0 | ดีเยี่ยม |
+| 75–79 | 3.5 | ดี |
+| 70–74 | 3.0 | ดี |
+| 65–69 | 2.5 | พอใช้ |
+| 60–64 | 2.0 | พอใช้ |
+| 55–59 | 1.5 | ผ่าน |
+| 50–54 | 1.0 | ผ่าน |
+| 0–49 | 0.0 | ไม่ผ่าน |
+
+GPA = average of subject grades (equal weight).
+
+## Sample Data & Output
 
 `students.csv` contains fictional sample data, including two intentionally invalid rows to demonstrate validation:
 
@@ -66,6 +112,7 @@ A full sample PDF is in [`docs/sample_report_card.pdf`](docs/sample_report_card.
 
 ```
 ├── rpa_bot.py          # main bot script
+├── test_rpa_bot.py     # tests for grading & validation
 ├── students.csv        # input data (sample)
 ├── requirements.txt
 ├── .env.example        # email config template
@@ -77,7 +124,17 @@ A full sample PDF is in [`docs/sample_report_card.pdf`](docs/sample_report_card.
 
 Edit `CONFIG` and `SUBJECTS` at the top of `rpa_bot.py` to change the school name, semester, passing score or subject list.
 
-##  Authors
+## Scheduling (optional)
+
+To run the bot automatically (e.g. at the end of each semester), use **Windows Task Scheduler** → *Create Basic Task* → action *Start a program*: `python` with argument `C:/path/to/rpa_bot.py`. On macOS/Linux use `cron`.
+
+## Limitations & Future Work
+
+- Input is CSV only (Excel `.xlsx` could be supported via `pandas.read_excel`)
+- Subjects have equal weight — no credit-hour weighting
+- One SMTP connection per email; fine for a class, slow for thousands of students
+
+## Authors
 
 - พีรพล อินทะสิทธิ์ (Phirapon Intasit)
 - พีรณัฐ เมฆฉาย (Peeranut Mekchay)

@@ -8,6 +8,7 @@ import pandas as pd
 import smtplib
 import logging
 import os
+import re
 from datetime import datetime
 from email.mime.multipart import MIMEMultipart
 from email.mime.base import MIMEBase
@@ -32,9 +33,11 @@ pdfmetrics.registerFont(TTFont("THSarabun-Bold", os.path.join(BASE_DIR, "fonts",
 
 # ========== CONFIG ==========
 CONFIG = {
-    "excel_path":    "students.csv",       # ไฟล์ข้อมูลนักเรียน
-    "output_folder": "report_cards",       # โฟลเดอร์เก็บ PDF
-    "log_file":      "bot_log.log",        # ไฟล์ log
+    # path อิงจากโฟลเดอร์ของสคริปต์ จึงรันจากโฟลเดอร์ไหนก็ได้
+    "input_path":    os.path.join(BASE_DIR, "students.csv"),   # ไฟล์ข้อมูลนักเรียน
+    "output_folder": os.path.join(BASE_DIR, "report_cards"),   # โฟลเดอร์เก็บ PDF
+    "summary_path":  os.path.join(BASE_DIR, "summary.csv"),    # ไฟล์สรุปผล
+    "log_file":      os.path.join(BASE_DIR, "bot_log.log"),    # ไฟล์ log
 
     # ตั้งค่า Email (SMTP)
     # ค่าทั้งหมดอ่านจากไฟล์ .env (ดูตัวอย่างใน .env.example)
@@ -70,7 +73,7 @@ logging.basicConfig(
 log = logging.getLogger(__name__)
 
 
-# ========== STEP 1: อ่านข้อมูล Excel ==========
+# ========== STEP 1: อ่านข้อมูล CSV ==========
 def read_student_data(path: str) -> pd.DataFrame:
     log.info(f"📂 อ่านข้อมูลจาก: {path}")
     df = pd.read_csv(path)
@@ -79,6 +82,8 @@ def read_student_data(path: str) -> pd.DataFrame:
 
 
 # ========== STEP 2: ตรวจสอบข้อมูล ==========
+EMAIL_RE = re.compile(r"[^@\s]+@[^@\s]+\.[^@\s]+")
+
 def validate_student(row: pd.Series) -> list[str]:
     errors = []
     required = ["student_id", "first_name", "last_name", "parent_email"]
@@ -90,10 +95,15 @@ def validate_student(row: pd.Series) -> list[str]:
         val = row.get(subj)
         if pd.isna(val):
             errors.append(f"ขาดคะแนน {SUBJECTS[subj]}")
-        elif not (0 <= float(val) <= 100):
+            continue
+        try:
+            ok = 0 <= float(val) <= 100
+        except ValueError:
+            ok = False
+        if not ok:
             errors.append(f"คะแนน {SUBJECTS[subj]} ไม่ถูกต้อง ({val})")
 
-    if "@" not in str(row.get("parent_email", "")):
+    if not EMAIL_RE.fullmatch(str(row.get("parent_email", "")).strip()):
         errors.append("รูปแบบ email ไม่ถูกต้อง")
 
     return errors
@@ -125,7 +135,7 @@ def calculate_gpa(row: pd.Series) -> float:
 # ========== STEP 4: สร้าง PDF Report Card ==========
 def generate_report_card(row: pd.Series, output_folder: str) -> str:
     os.makedirs(output_folder, exist_ok=True)
-    filename = f"{output_folder}/{row['student_id']}_report_card.pdf"
+    filename = os.path.join(output_folder, f"{row['student_id']}_report_card.pdf")
 
     doc = SimpleDocTemplate(
         filename,
@@ -278,13 +288,13 @@ def generate_report_card(row: pd.Series, output_folder: str) -> str:
 
 
 # ========== STEP 5: ส่ง Email ==========
-def send_email(row: pd.Series, pdf_path: str):
+# คืนค่า "sent" / "skipped" — ถ้าส่งไม่สำเร็จจะ raise ให้ main() บันทึกเป็น error
+def send_email(row: pd.Series, pdf_path: str) -> str:
     if not CONFIG["send_email"]:
         log.info(f"  📧 [SKIP] ส่ง Email ถึง {row['parent_email']} (ปิดใน config)")
-        return
+        return "skipped"
     if not CONFIG["email_sender"] or not CONFIG["email_password"]:
-        log.error("  ❌ ยังไม่ได้ตั้งค่า EMAIL_SENDER / EMAIL_PASSWORD ในไฟล์ .env")
-        return
+        raise RuntimeError("ยังไม่ได้ตั้งค่า EMAIL_SENDER / EMAIL_PASSWORD ในไฟล์ .env")
 
     full_name = f"{row['first_name']} {row['last_name']}"
     msg = MIMEMultipart()
@@ -313,19 +323,17 @@ def send_email(row: pd.Series, pdf_path: str):
                         f"attachment; filename={os.path.basename(pdf_path)}")
         msg.attach(part)
 
-    try:
-        with smtplib.SMTP(CONFIG["smtp_host"], CONFIG["smtp_port"]) as server:
-            server.starttls()
-            server.login(CONFIG["email_sender"], CONFIG["email_password"])
-            server.send_message(msg)
-        log.info(f"  ✉️  ส่ง Email สำเร็จ → {row['parent_email']}")
-    except Exception as e:
-        log.error(f"  ❌ ส่ง Email ล้มเหลว: {e}")
+    with smtplib.SMTP(CONFIG["smtp_host"], CONFIG["smtp_port"]) as server:
+        server.starttls()
+        server.login(CONFIG["email_sender"], CONFIG["email_password"])
+        server.send_message(msg)
+    log.info(f"  ✉️  ส่ง Email สำเร็จ → {row['parent_email']}")
+    return "sent"
 
 
 # ========== STEP 6: บันทึก Log ผลลัพธ์ ==========
 def save_summary_log(results: list[dict]):
-    summary_path = "summary.csv"
+    summary_path = CONFIG["summary_path"]
     df = pd.DataFrame(results)
     df.to_csv(summary_path, index=False, encoding="utf-8-sig")
     log.info(f"\n📊 สรุปผล → {summary_path}")
@@ -339,7 +347,7 @@ def main():
     log.info("🤖 RPA Bot เริ่มทำงาน")
     log.info("=" * 50)
 
-    df = read_student_data(CONFIG["excel_path"])
+    df = read_student_data(CONFIG["input_path"])
     results = []
 
     for idx, row in df.iterrows():
@@ -359,13 +367,14 @@ def main():
             pdf_path = generate_report_card(row, CONFIG["output_folder"])
 
             # Send Email
-            send_email(row, pdf_path)
+            email_status = send_email(row, pdf_path)
 
             results.append({"student_id": student_id,
                             "name": f"{row['first_name']} {row['last_name']}",
                             "gpa": calculate_gpa(row),
                             "pdf": pdf_path,
                             "email": row["parent_email"],
+                            "email_status": email_status,
                             "status": "success", "reason": ""})
 
         except Exception as e:
